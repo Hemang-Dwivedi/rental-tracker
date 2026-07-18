@@ -560,6 +560,18 @@ function normalizeHousing(p){
   r.raw=p;
   return r;
 }
+function normalizeHousingLD(p){
+  const r={source:'Housing',id:p.id,type:p.type||null,title:p.title||null,building:p.building||null,
+    locality:p.locality||null,localityRaw:p.localityRaw||null,
+    rent:p.rent!=null?p.rent:null,deposit:null,maint:null,size:p.size||null,
+    bathroom:null,balconies:null,furnish:null,floor:null,totalFloor:null,facing:null,parking:null,
+    tenant:null,leaseTypes:[],negotiable:false,postedBy:p.postedBy||null,owner:p.owner||null,
+    available:null,age:null,desc:null,lat:p.lat,lng:p.lng,
+    url:p.url||'#',photos:Array.isArray(p.photos)?p.photos:[],addedAt:Date.now(),
+    postedAt:p.postedAt||null,active:p.active!==false,inactiveReason:p.inactiveReason||null,
+    straight:null,driveKm:null,driveMin:null};
+  coordGuard(r); r.raw=p; return r;
+}
 function normalizeSquareYards(p){
   // p is already a flat pre-parsed object from the SY HTML extractor (has __sy marker)
   const num=x=>{if(x==null)return null;const n=parseInt(String(x).replace(/[^0-9]/g,''),10);return isNaN(n)?null:n;};
@@ -591,6 +603,7 @@ function normalize(p){
   if(hint==='Magicbricks')return normalizeMagicbricks(p);
   if(hint==='Housing')return normalizeHousing(p);
   if(hint==='NoBroker')return normalizeNoBroker(p);
+  if(p&&p.__ho)return normalizeHousingLD(p);
   if(p&&p.__sy)return normalizeSquareYards(p);
   if(p&&(p.PROP_ID!==undefined||p.SPID!==undefined)&&p.propertyTitle===undefined)return normalize99acres(p);
   if(p&&(p.psmid!==undefined||p.pmtLat!==undefined||p.ltcoordGeo!==undefined)&&p.PROP_ID===undefined)return normalizeMagicbricks(p);
@@ -996,6 +1009,41 @@ document.getElementById('grid').addEventListener('click',e=>{
 // Square Yards page parser: listings live as HTML attributes across two element
 // types (map-cta smalls and propertyId buttons), joined by propertyId.
 // Shared by the HAR path and the paste path - keep it in one place.
+function hoFromLD(html){
+  // Housing renders listings as schema.org JSON-LD (Product/Apartment) in the page
+  // document. Richer + more stable than scraping the React DOM. Verified against a
+  // real Kharadi page: 30/30 with price, coords, locality, seller-type, photos.
+  const out=[];
+  const bl=(html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)||[])
+    .map(s=>s.replace(/^<script[^>]*>/,'').replace(/<\/script>$/,''));
+  for(const b of bl){
+    let j; try{j=JSON.parse(b);}catch(_){continue;}
+    const items=Array.isArray(j)?j:(j['@graph']||[j]);
+    for(const it of items){
+      const t=it&&it['@type'];
+      const isL=Array.isArray(t)?(t.indexOf('Product')>=0||t.indexOf('Apartment')>=0):(t==='Product'||t==='Apartment');
+      if(!isL||!it.offers)continue;
+      const o=it.offers||{}; const seller=Array.isArray(o.seller)?o.seller[0]:o.seller;
+      const slug=String(it.url||o.url||'').replace(/^undefined/,'');
+      const idm=slug.match(/\/(\d{6,})/); const id=idm?idm[1]:String(it.name||'').slice(0,16)+slug.slice(-8);
+      const chain=[]; let cip=it.containedInPlace; while(cip&&cip.name){chain.push(cip.name);cip=cip.containedInPlace;}
+      const loc=chain.find(n=>/kharadi|hadapsar|mundhwa|manjari|ghorpadi|wadgaon|magarpatta|viman|koregaon|kalyani/i.test(n))||chain[Math.max(0,chain.length-3)]||chain[0]||null;
+      const bhk=String(it.name||'').match(/(\d+(?:\.\d+)?)\s*BHK/i);
+      const photos=[it.photo,it.image].filter(u=>u&&u.indexOf('mystery-man')===-1);
+      out.push({__ho:true,__src:'Housing',id:'hs_'+id,
+        type:bhk?bhk[1]+' BHK':null,title:it.name||null,building:it.address||null,
+        locality:loc?normLoc(loc):null,localityRaw:it.address||null,
+        rent:(o.price!=null)?(typeof o.price==='number'?o.price:parseInt(String(o.price).replace(/[^0-9]/g,''),10)||null):null,
+        size:null,lat:(it.geo&&it.geo.latitude)?parseFloat(it.geo.latitude):null,
+        lng:(it.geo&&it.geo.longitude)?parseFloat(it.geo.longitude):null,
+        postedBy:(seller&&seller['@type']==='RealEstateAgent')?'Agent':(seller?'Owner':null),
+        owner:seller?(seller.name||null):null,leaseTypes:[],
+        photos:photos,url:slug?('https://housing.com'+slug):'#',
+        postedAt:null,active:true,inactiveReason:null});
+    }
+  }
+  return out.length?out:null;
+}
 function syFromHtml(html){
   const attrsOf=t=>{const o={};const re=/([\w:-]+)\s*=\s*"([^"]*)"/g;let m;while((m=re.exec(t))!==null)o[m[1].toLowerCase()]=m[2];return o;};
   const pidOf=u=>{const m=String(u||'').match(/\/(\d+)(?:[/?#]|$)/);return m?m[1]:null;};
@@ -1057,6 +1105,7 @@ function extractFromHar(harText){
     const isMBapi=url.indexOf('/mbsrp/propertySearch')!==-1;
     const isMB=isMBhtml||isMBapi;
     const isHousing=url.indexOf('apiName=SEARCH_RESULTS')!==-1&&url.indexOf('housing.com')!==-1;
+    const isHousingDoc=url.indexOf('housing.com/rent/')!==-1||url.indexOf('housing.com/buy/')!==-1||url.indexOf('housing.com/flats')!==-1;
     const isSY=url.indexOf('squareyards.com/rent/')!==-1||url.indexOf('squareyards.com/sale/')!==-1;
     if(!isNB&&!isAcres&&!isMB&&!isHousing&&!isSY)continue;
     apiCalls++;
@@ -1068,6 +1117,7 @@ function extractFromHar(harText){
     }
     else if(isMBhtml){ arr=mbFromHtml(body); src='Magicbricks'; }
     else if(isSY){ arr=syFromHtml(body); src='Square Yards'; }
+    else if(isHousingDoc){ arr=hoFromLD(body); src='Housing'; }
     else {
       let j; try{j=JSON.parse(body);}catch(_){continue;}
       if(isHousing){ try{arr=j.data.searchResults.properties;}catch(_){arr=null;} src='Housing'; }
@@ -1120,6 +1170,7 @@ function extractFromPageSource(src){
   // Square Yards: HTML attributes (map-cta + propertyId buttons)
   try{if(src.indexOf('class="map-cta"')!==-1||src.indexOf('propertyId="')!==-1){
     const out=syFromHtml(src); if(out&&out.length)return {list:out,source:'Square Yards'};}}catch(_){}
+  try{const ho=hoFromLD(src); if(ho&&ho.length)return {list:ho,source:'Housing'};}catch(_){}
   // NoBroker: generic embedded propertyList - check LAST (least specific signature)
   try{const nb=extractListings(src); if(nb&&nb.length){nb.forEach(p=>p.__src='NoBroker');return {list:nb,source:'NoBroker'};}}catch(_){}
   return {list:[]};

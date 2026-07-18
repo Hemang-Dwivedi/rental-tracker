@@ -80,6 +80,26 @@
     if (html !== window.__nbtbSyLast) { window.__nbtbSyLast = html; send('https://www.squareyards.com' + location.pathname, html); }
   } catch (_) {} };
 
+  // Housing renders listings as schema.org JSON-LD (Product/Apartment) in the page.
+  // Grab those <script type="application/ld+json"> blocks and emit them under the
+  // page URL so the tracker's hoFromLD parser handles them. Far more stable than
+  // scraping the React DOM.
+  const housing = () => { try {
+    if (location.hostname.indexOf('housing.com') === -1) return;
+    if (!/\/(rent|buy|flats)/.test(location.pathname)) return;
+    const blocks = document.querySelectorAll('script[type="application/ld+json"]');
+    if (!blocks.length) return;
+    let joined = ''; blocks.forEach(s => { joined += s.textContent; });
+    if (joined.indexOf('GeoCoordinates') === -1 && joined.indexOf('"offers"') === -1) return; // no listings yet (still hydrating)
+    let html = ''; blocks.forEach(s => { html += '<script type="application/ld+json">' + s.textContent + '<\/script>'; });
+    if (html === window.__nbtbHoLast) return;
+    window.__nbtbHoLast = html;
+    send('https://housing.com' + location.pathname + location.search, html);
+    // total: the ItemList numberOfItems
+    const m = joined.match(/"numberOfItems"\s*:\s*(\d+)/);
+    if (m) announceTotal(location.href, JSON.stringify({ total: parseInt(m[1], 10) }));
+  } catch (_) {} };
+
   // 99acres server-renders the page you land on into window.__initialData__ and
   // only PREFETCHES other pages over XHR. Without this, every landed page is
   // invisible to us. Emit it under a canonical srp/search URL so the tracker's
@@ -110,7 +130,7 @@
     announceTotal(location.href, payload);
   } catch (_) {} };
 
-  const scan = () => { mb(); sy(); acres(); };
+  const scan = () => { mb(); sy(); acres(); housing(); };
   window.addEventListener('load', () => setTimeout(scan, 1200));
   let t = null; const later = () => { clearTimeout(t); t = setTimeout(scan, 1500); };
   window.addEventListener('scroll', later, { passive: true });
