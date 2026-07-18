@@ -37,14 +37,14 @@ Sorting by drive time is worthless if the coordinates are fiction. So most of th
 
 | | |
 |---|---|
-| **`tracker.html`** | The whole app. One file. Open it in a browser. Data lives in IndexedDB. |
+| **`index.html`** | The whole app. One file. Open it in a browser. Data lives in IndexedDB. |
 | **`capture-bridge/`** | Optional Chrome extension. Reads portal search responses *as you browse* and syncs them into the tracker. |
 
 The extension is deliberately dumb: it captures raw responses and hands them over. All parsing, trust-grading and classification happens in the tracker — so the tool can evolve without ever reinstalling the extension.
 
 ## Quick start
 
-1. Download `tracker.html` and open it in Chrome (or host it — see below)
+1. Download `index.html` (or open the hosted version) and open it in Chrome (or host it — see below)
 2. **Set your destination**: right-click your office in Google Maps → click the coordinates to copy → paste into the *Destination* field → *Set destination*
 3. Get listings in, either way:
    - **Manual**: on a portal search page, DevTools → Network → export HAR → *Import HAR* in the tracker
@@ -123,7 +123,7 @@ npm install
 npm test
 ```
 
-The suite loads the real `tracker.html` into jsdom against a fake IndexedDB and drives the actual merge, filter, render and persistence paths — not mocks of them. It covers the five portal parsers, the coordinate guards, pin-trust grading, dedup, the capture bridge, change classification and the destination config.
+The suite loads the real `index.html` into jsdom against a fake IndexedDB and drives the actual merge, filter, render and persistence paths — not mocks of them. It covers the five portal parsers, the coordinate guards, pin-trust grading, dedup, the capture bridge, change classification and the destination config.
 
 Most of it is regression tests for bugs found in the wild, and each one encodes a rule worth keeping:
 

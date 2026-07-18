@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Rental Tracker Capture Bridge",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Tees rental-listing API responses from property portals while you browse and syncs them into your local Rental Tracker page. Everything stays on your machine.",
   "permissions": [
     "storage",
@@ -45,7 +45,8 @@
     },
     {
       "matches": [
-        "file:///*"
+        "file:///*",
+        "https://hemang-dwivedi.github.io/*"
       ],
       "js": [
         "bridge.js"

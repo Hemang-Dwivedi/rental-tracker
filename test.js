@@ -2,7 +2,7 @@ const fs = require('fs');
 require('fake-indexeddb/auto');
 const { JSDOM, VirtualConsole } = require('jsdom');
 
-const html = fs.readFileSync(__dirname + '/tracker.html', 'utf8');
+const html = fs.readFileSync(__dirname + '/index.html', 'utf8');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let passed = 0, failed = 0;
 const ok = (cond, name, extra='') => {
@@ -29,7 +29,7 @@ function makeDom() {
   vc.on('jsdomError', () => {});
   const state = { blobs: [], fetch: async () => ({ status: 200, json: async () => ({}) }) };
   const dom = new JSDOM(html, {
-    url: 'https://localhost/tracker.html',
+    url: 'https://localhost/index.html',
     runScripts: 'dangerously',
     virtualConsole: vc,
     beforeParse(w) {
