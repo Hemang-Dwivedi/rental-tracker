@@ -1,0 +1,14 @@
+{
+  "name": "rental-tracker",
+  "version": "1.0.0",
+  "description": "Local-first multi-portal rental tracker with map-pin trust grading and commute ranking",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "fake-indexeddb": "^5.0.0"
+  },
+  "license": "MIT",
+  "private": true
+}
