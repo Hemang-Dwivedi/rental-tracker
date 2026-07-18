@@ -124,6 +124,19 @@
   const zz = ms => new Promise(r => setTimeout(r, ms));
   const pageH = () => Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
   const atBottom = () => (window.scrollY + window.innerHeight) >= pageH() - 80;
+  // Housing's infinite loader occasionally stalls: the bottom sentinel fails to
+  // fire, so the next SEARCH_RESULTS page never requests and those ~30 listings
+  // never even reach the network. A short up-then-down jiggle re-arms the sentinel.
+  // Scoped to housing.com so the tuned timing on other portals is untouched.
+  const isHousing = location.hostname.indexOf('housing.com') !== -1;
+  async function jiggle() {
+    const h = pageH();
+    // up two viewport-steps, then back down to the bottom - two down-scrolls
+    window.scrollBy(0, -Math.round(window.innerHeight * 1.2)); await zz(500 + Math.random() * 400);
+    window.scrollBy(0, -Math.round(window.innerHeight * 1.2)); await zz(500 + Math.random() * 400);
+    window.scrollTo(0, h * 0.6);                               await zz(400 + Math.random() * 300);
+    window.scrollTo(0, pageH());                               await zz(1400 + Math.random() * 900);
+  }
   async function autoScroll() {
     stopFlag = false;
     let last = pageH(), strikes = 0, rounds = 0;
@@ -143,7 +156,16 @@
       // at the bottom with no growth: give a slow loader one more beat before counting a strike
       await zz(1600);
       h = pageH();
-      if (h > last) { strikes = 0; last = h; } else strikes++;
+      if (h > last) { strikes = 0; last = h; continue; }
+      // Housing may have stalled rather than finished: jiggle up-and-down to re-arm
+      // the loader, but only on the first two strikes so a genuinely exhausted page
+      // still terminates (strike 3 -> 4 ends the loop as before).
+      if (isHousing && strikes < 2) {
+        await jiggle();
+        h = pageH();
+        if (h > last) { strikes = 0; last = h; continue; }
+      }
+      strikes++;
     }
     window.scrollTo(0, 0);
     await zz(800); // let the last teed batch land in the relay

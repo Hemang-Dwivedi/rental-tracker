@@ -1074,6 +1074,40 @@ function syFromHtml(html){
   }
   return out.length?out:null;
 }
+// Housing GraphQL parser: data.searchResults.properties[] from apiName=SEARCH_RESULTS.
+// Housing dropped server-rendered JSON-LD; listings now arrive only as this GraphQL
+// JSON (teed live by the extension, or present in a HAR). Normalizes to the same
+// canonical record shape as syFromHtml so records merge into one table + map.
+function hoFromGql(props){
+  if(!Array.isArray(props))return null;
+  const num=v=>{const n=parseInt(String(v==null?'':v).replace(/[^\d]/g,''),10);return isNaN(n)?null:n;};
+  const facOf=(r,id)=>{const f=(r.featureAndConfig||[]).find(x=>x&&x.id===id);return f?f.description:null;};
+  const bhkOf=r=>{const t=String(r.title||'');const m=t.match(/(\d+(?:\.\d+)?)\s*(BHK|RK)/i);return m?m[1]+' '+m[2].toUpperCase():(t||null);};
+  const firstImg=r=>{try{const g=(r.details&&r.details.images)||[];for(const grp of g){const im=(grp&&grp.images)||[];if(im.length&&im[0]&&im[0].src)return im[0].src;}}catch(_){}
+    return r.coverImageUrl||null;};
+  const out=[];
+  for(const r of props){
+    if(!r||typeof r!=='object')continue;
+    const pid=r.listingId||r.originalListingId; if(pid==null)continue;
+    const sl=(r.sellers&&r.sellers[0])||null;
+    const isOwner=r.ownerListingBadge===true||(sl&&String(sl.type||'').toLowerCase()==='owner');
+    const co=Array.isArray(r.coords)?r.coords:[];
+    const addr=(r.address&&r.address.address)||null;
+    const size=(r.builtUpArea&&r.builtUpArea.value)||num(facOf(r,'carpetArea'))||null;
+    const img=firstImg(r);
+    out.push({__ho:true,__src:'Housing',id:'hs_'+pid,type:bhkOf(r),
+      title:r.title||null,building:r.entityProjectName||null,
+      locality:addr,rent:(typeof r.price==='number'?r.price:num(r.price)),size:size,
+      lat:co[0]!=null?parseFloat(co[0]):null,lng:co[1]!=null?parseFloat(co[1]):null,
+      owner:sl?(sl.firmName||sl.name||null):null,postedBy:isOwner?'Owner':'Agent',
+      furnish:facOf(r,'furnishing'),
+      posted:r.postedDate||null,updated:r.updatedAt||null,
+      status:r.isActiveProperty===false?'removed':'active',
+      photos:img?[img]:[],
+      url:r.url?('https://housing.com'+r.url):'#'});
+  }
+  return out.length?out:null;
+}
 // Magicbricks page parser: SERVER_PRELOADED_STATE_ JSON blob via balanced-brace scan.
 // Shared by the HAR path and the paste path.
 function mbFromHtml(html){
@@ -1120,7 +1154,7 @@ function extractFromHar(harText){
     else if(isHousingDoc){ arr=hoFromLD(body); src='Housing'; }
     else {
       let j; try{j=JSON.parse(body);}catch(_){continue;}
-      if(isHousing){ try{arr=j.data.searchResults.properties;}catch(_){arr=null;} src='Housing'; }
+      if(isHousing){ try{arr=hoFromGql(j.data.searchResults.properties);}catch(_){arr=null;} src='Housing'; }
       else if(isAcres){ if(Array.isArray(j.properties))arr=j.properties; src='99acres'; }
       else { src='NoBroker'; const d=j&&j.data;
         if(Array.isArray(d))arr=d;
@@ -1135,7 +1169,7 @@ function extractFromHar(harText){
       if(src==='Square Yards')pid=p.id;
       else if(src==='99acres')pid='99a_'+(p.PROP_ID||p.SPID);
       else if(src==='Magicbricks')pid='mb_'+(p.id||p.psmid);
-      else if(src==='Housing')pid='hs_'+(p.listingId||p.originalListingId);
+      else if(src==='Housing')pid=p.id||('hs_'+(p.listingId||p.originalListingId));
       else pid='nb_'+(p.id||p.propertyId);
       if(pid&&pid.indexOf('undefined')===-1){p.__src=src;byId[pid]=p;sources[src]=(sources[src]||0)+1;}
     }
