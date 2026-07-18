@@ -4,8 +4,17 @@
 (() => {
   if (window.__nbtbHooked) return; window.__nbtbHooked = true;
   // URL fragments mirror the tracker's HAR router exactly
-  const WANT = ['/multi/property/RENT/filter', '/api-aggregator/srp/search', '/mbsrp/propertySearch', 'apiName=SEARCH_RESULTS'];
+  const WANT = ['/multi/property/RENT/filter', '/api-aggregator/srp/search', '/mbsrp/propertySearch', 'apiName=SEARCH_RESULTS', 'getListingV3FilterTile'];
   const hit = u => { u = String(u || ''); return WANT.some(w => u.indexOf(w) !== -1); };
+  // Square Yards returns {html, totalCount} from getListingV3FilterTile. Unwrap the
+  // html blob and tag the URL so the tracker's SY parser handles it; the totalCount
+  // rides along in a marker the coverage reader can find.
+  const syUnwrap = (url, text) => {
+    if (String(url).indexOf('getListingV3FilterTile') === -1) return [text, url];
+    try { const j = JSON.parse(text); const html = j.html || ''; const tc = j.totalCount != null ? j.totalCount : ''; 
+      return ['<!--SYTOTAL:' + tc + '-->' + html, 'https://www.squareyards.com/__sylisting?total=' + tc]; }
+    catch (_) { return [text, url]; }
+  };
   const tag99 = (u) => { try {
     if (location.hostname.indexOf('99acres') === -1) return u;
     const loc = new URLSearchParams(location.search).get('locality') || location.pathname;
@@ -37,7 +46,7 @@
     const p = F.apply(this, a);
     try {
       const u = (a[0] && a[0].url) || a[0];
-      if (hit(u)) p.then(r => { try { if (r.status === 304 || !r.ok) return; r.clone().text().then(t => { if (t && t.length > 200) { send(r.url || u, t); announceTotal(r.url || u, t); } }).catch(() => {}); } catch (_) {} }).catch(() => {}); // observation chain must never surface as an unhandled rejection
+      if (hit(u)) p.then(r => { try { if (r.status === 304 || !r.ok) return; r.clone().text().then(t => { if (t && t.length > 200) { const [txt, purl] = syUnwrap(r.url || u, t); send(purl, txt); announceTotal(purl, txt); } }).catch(() => {}); } catch (_) {} }).catch(() => {}); // observation chain must never surface as an unhandled rejection
     } catch (_) {}
     return p;
   };
@@ -46,7 +55,7 @@
   XMLHttpRequest.prototype.open = function (m, u, ...r) { try { this.__nbtbU = u; } catch (_) {} return O.call(this, m, u, ...r); };
   XMLHttpRequest.prototype.send = function (...a) {
     try { if (hit(this.__nbtbU)) { this.addEventListener('error', () => {}); this.addEventListener('abort', () => {}); } } catch (_) {}
-    try { if (hit(this.__nbtbU)) this.addEventListener('loadend', () => { try { if ((this.responseType === '' || this.responseType === 'text') && this.status !== 304 && this.status >= 200 && this.status < 300) { const rt = this.responseText; if (rt && rt.length > 200) { send(this.responseURL || this.__nbtbU, rt); announceTotal(this.responseURL || this.__nbtbU, rt); } } } catch (_) {} }); } catch (_) {}
+    try { if (hit(this.__nbtbU)) this.addEventListener('loadend', () => { try { if ((this.responseType === '' || this.responseType === 'text') && this.status !== 304 && this.status >= 200 && this.status < 300) { const rt = this.responseText; if (rt && rt.length > 200) { const [txt, purl] = syUnwrap(this.responseURL || this.__nbtbU, rt); send(purl, txt); announceTotal(purl, txt); } } } catch (_) {} }); } catch (_) {}
     return S.apply(this, a);
   };
 

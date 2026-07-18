@@ -149,8 +149,49 @@
     await zz(800); // let the last teed batch land in the relay
     return { rounds, height: last, stopped: stopFlag };
   }
+
+  // Square Yards paginates via AJAX: clicking li.applyPagination[data-page=N] swaps
+  // content in place (URL never changes). We read the page numbers from the DOM,
+  // click through them in order, and let each click fire the site's own request -
+  // the interceptor captures the getListingV3FilterTile response. We never forge the
+  // request; we drive the same control a person would, paced and bounded.
+  async function syWalk(opts){
+    opts = opts || {};
+    const maxPages = opts.maxPages || 30;         // hard safety rail
+    const minGap = opts.minGap || 4000, jitter = opts.jitter || 4000;
+    const pagerLis = () => Array.from(document.querySelectorAll('li.applyPagination[data-page]'));
+    const pageNums = () => Array.from(new Set(pagerLis().map(li => parseInt(li.getAttribute('data-page'),10)).filter(n=>!isNaN(n)))).sort((a,b)=>a-b);
+    // discover the last page from the pager (e.g. the "...15" tail)
+    let nums = pageNums();
+    if (!nums.length) return { pages: 0, last: 1, note: 'no pager found (single page)' };
+    const last = Math.min(Math.max(...nums), maxPages);
+    let walked = 1;                                // page 1 is already loaded on arrival
+    // ALWAYS advance via the right-arrow, never by clicking a specific page number:
+    // the pager collapses middle pages behind "..." (e.g. 1 ... 3 4 5 ... 15), so
+    // data-page="2" often does not exist. The right-arrow always means "next page"
+    // regardless of collapse, so it is the only reliable way to walk sequentially.
+    for (let p = 2; p <= last && !stopFlag; p++){
+      // the right-arrow is the last applyPagination li carrying the arrow icon
+      const arrowLi = Array.from(document.querySelectorAll('li.applyPagination')).find(li => li.querySelector('[class*="icon-arrow-right"]'));
+      if (!arrowLi) break;                         // no next-arrow -> we are on the last page
+      // if the arrow is disabled/absent target, stop
+      const target = arrowLi.getAttribute('data-page');
+      arrowLi.click();
+      await zz(minGap + Math.random()*jitter);     // paced, non-uniform gap between pages
+      let tries = 0;
+      while (tries < 8 && document.querySelector('.npLoader, .loading, [class*="loader"]')) { await zz(1000); tries++; }
+      walked++;
+      // safety: if clicking did not advance (arrow target unchanged), stop to avoid a loop
+      const activeNow = document.querySelector('li.applyPagination.active[data-page]');
+      if (activeNow && parseInt(activeNow.getAttribute('data-page'),10) >= last) break;
+    }
+    window.scrollTo(0,0);
+    await zz(800);                                 // let the last teed batch land
+    return { pages: walked, last, stopped: stopFlag };
+  }
   chrome.runtime.onMessage.addListener((m, sender, sendResponse) => {
     if (m && m.cmd === 'nbtb-scroll') { autoScroll().then(sendResponse); return true; }
+    if (m && m.cmd === 'nbtb-sypage') { syWalk(m.opts).then(sendResponse); return true; }
     if (m && m.cmd === 'nbtb-stopscroll') { stopFlag = true; }
   });
 })();

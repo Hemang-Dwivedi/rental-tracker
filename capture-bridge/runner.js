@@ -155,10 +155,25 @@ async function scrollSearch(url, label) {
   if (!loaded) log('  page load timed out - capturing whatever arrived', 'err');
   await zz(2500 + Math.random() * 1500);
   let scrolled = null;
+  const isSY = host.indexOf('squareyards') !== -1;
   try {
-    scrolled = await Promise.race([chrome.tabs.sendMessage(tab.id, { cmd: 'nbtb-scroll' }), zz(420000).then(() => 'cap')]);
-    if (scrolled === 'cap') { try { await chrome.tabs.sendMessage(tab.id, { cmd: 'nbtb-stopscroll' }); } catch (_) {} await zz(2500); log('  scroll cap (7 min) reached - very deep page; tighten the filters.', 'err'); }
-    else if (scrolled) log(`  scrolled ${scrolled.rounds} rounds (height ${scrolled.height})`);
+    if (isSY) {
+      // Square Yards paginates via in-page AJAX clicks, not scroll. Walk the pager
+      // one page at a time, spending budget per page like any other request. Page 1
+      // is already captured on load; each click fires the site's own listing fetch.
+      const walk = await Promise.race([chrome.tabs.sendMessage(tab.id, { cmd: 'nbtb-sypage', opts: { maxPages: 30, minGap: 4000, jitter: 4000 } }), zz(600000).then(() => 'cap')]);
+      if (walk === 'cap') { try { await chrome.tabs.sendMessage(tab.id, { cmd: 'nbtb-stopscroll' }); } catch (_) {} log('  pagination cap reached; captured what loaded.', 'err'); }
+      else if (walk && walk.pages != null) {
+        // charge the remaining pages against the SY budget (page 1 already charged by rlWait above)
+        for (let i = 1; i < walk.pages; i++) { await rlTake('www.squareyards.com'); }
+        log(`  walked ${walk.pages} of ${walk.last} page(s) via the site pager`, walk.pages >= walk.last ? 'ok' : undefined);
+      }
+      scrolled = walk;
+    } else {
+      scrolled = await Promise.race([chrome.tabs.sendMessage(tab.id, { cmd: 'nbtb-scroll' }), zz(420000).then(() => 'cap')]);
+      if (scrolled === 'cap') { try { await chrome.tabs.sendMessage(tab.id, { cmd: 'nbtb-stopscroll' }); } catch (_) {} await zz(2500); log('  scroll cap (7 min) reached - very deep page; tighten the filters.', 'err'); }
+      else if (scrolled) log(`  scrolled ${scrolled.rounds} rounds (height ${scrolled.height})`);
+    }
   } catch (e) { scrolled = 'unreachable'; log('  ⚠ our capture script did not run — redirect, challenge or block page?', 'err'); }
   await zz(1500);
   try { await chrome.tabs.remove(tab.id); } catch (_) {}
