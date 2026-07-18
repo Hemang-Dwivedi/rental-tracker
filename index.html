@@ -1028,10 +1028,10 @@ function hoFromLD(html){
       const idm=slug.match(/\/(\d{6,})/); const id=idm?idm[1]:String(it.name||'').slice(0,16)+slug.slice(-8);
       const chain=[]; let cip=it.containedInPlace; while(cip&&cip.name){chain.push(cip.name);cip=cip.containedInPlace;}
       const loc=chain.find(n=>/kharadi|hadapsar|mundhwa|manjari|ghorpadi|wadgaon|magarpatta|viman|koregaon|kalyani/i.test(n))||chain[Math.max(0,chain.length-3)]||chain[0]||null;
-      const bhk=String(it.name||'').match(/(\d+(?:\.\d+)?)\s*BHK/i);
+      const bhk=String(it.name||'').match(/(\d+(?:\.\d+)?)\s*(BHK|RK)/i);
       const photos=[it.photo,it.image].filter(u=>u&&u.indexOf('mystery-man')===-1);
       out.push({__ho:true,__src:'Housing',id:'hs_'+id,
-        type:bhk?bhk[1]+' BHK':null,title:it.name||null,building:it.address||null,
+        type:bhk?(bhk[1]+' '+bhk[2].toUpperCase()):null,title:it.name||null,building:it.address||null,
         locality:loc?normLoc(loc):null,localityRaw:it.address||null,
         rent:(o.price!=null)?(typeof o.price==='number'?o.price:parseInt(String(o.price).replace(/[^0-9]/g,''),10)||null):null,
         size:null,lat:(it.geo&&it.geo.latitude)?parseFloat(it.geo.latitude):null,
@@ -1141,7 +1141,7 @@ function extractFromHar(harText){
     const isHousing=url.indexOf('apiName=SEARCH_RESULTS')!==-1&&url.indexOf('housing.com')!==-1;
     const isHousingDoc=url.indexOf('housing.com/rent/')!==-1||url.indexOf('housing.com/buy/')!==-1||url.indexOf('housing.com/flats')!==-1;
     const isSY=url.indexOf('squareyards.com/rent/')!==-1||url.indexOf('squareyards.com/sale/')!==-1;
-    if(!isNB&&!isAcres&&!isMB&&!isHousing&&!isSY)continue;
+    if(!isNB&&!isAcres&&!isMB&&!isHousing&&!isHousingDoc&&!isSY)continue;
     apiCalls++;
     const body=decode((e.response&&e.response.content)||{});
     if(!body)continue;
