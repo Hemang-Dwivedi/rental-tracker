@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{font:13px/1.45 system-ui,sans-serif;width:300px;margin:0;padding:14px;color:#1c2733}
+h1{font-size:13px;margin:0 0 8px;color:#2B6FD4}
+.n{font-size:26px;font-weight:800}
+.muted{color:#6b7a8c;font-size:12px;margin:2px 0 10px}
+textarea{width:100%;box-sizing:border-box;height:96px;font:11px ui-monospace,monospace;border:1px solid #d7dee7;border-radius:8px;padding:6px}
+button{width:100%;margin-top:6px;padding:7px;border-radius:8px;border:1px solid #d7dee7;background:#fff;cursor:pointer;font-size:12px}
+button:hover{border-color:#2B6FD4}
+#run{background:#2B6FD4;color:#fff;border-color:#2B6FD4;font-weight:700}
+#clr{color:#8B2252}
+.hint{font-size:11px;color:#6b7a8c;margin-top:4px}
+</style></head><body>
+<h1>Rental Tracker Capture</h1>
+<div class="n" id="n">0</div>
+<div class="muted"><span id="sz">0.0 MB</span> pending · open the tracker and it syncs itself</div>
+<textarea id="urls" placeholder="One saved-search URL per line&#10;https://www.nobroker.in/property/rent/pune/Hadapsar?...&#10;https://www.99acres.com/...-page-{1-5}"></textarea>
+<div class="hint">99acres searches are walked one page at a time, spaced by a full search on each other portal (and a random delay). Order in the list doesn't matter.</div>
+<button id="run">▶ Run capture (opens &amp; scrolls each page)</button>
+<button id="dl">Download as HAR (fallback)</button>
+<button id="clr">Clear captured</button>
+<div id="bud" class="hint" style="margin-top:8px;line-height:1.6"></div>
+<button id="rst">Reset 99acres resume points</button>
+<script src="popup.js"></script>
+</body></html>

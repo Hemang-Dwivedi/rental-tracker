@@ -1,0 +1,42 @@
+name: tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [ 20, 22 ]
+    name: node ${{ matrix.node }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+
+      # The suite drives the real tracker.html in jsdom against a fake
+      # IndexedDB: parsers, coordinate guards, pin-trust grading, dedup,
+      # the capture bridge, change classification and the destination config.
+      - name: Run test suite
+        run: npm test
+
+      # Guard against the mistake that matters most in this repo: committing
+      # captured data. HARs carry session cookies; backups carry other
+      # people's personal data. .gitignore blocks them - this proves it.
+      - name: Assert no captured data is tracked
+        run: |
+          if git ls-files | grep -E '\.har$|backup.*\.json$|pin_worklist|pin_corrections|\.csv$'; then
+            echo "::error::Captured data is tracked by git. HARs contain session cookies; backups contain personal data. Remove it and rewrite history."
+            exit 1
+          fi
+          echo "OK: no captured data tracked."

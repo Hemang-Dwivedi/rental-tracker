@@ -1,0 +1,22 @@
+# ---- NEVER COMMIT: captured data and browser exports ----
+# HAR files contain your request headers, including session cookies and auth
+# tokens for every portal you were logged into. Publishing one publishes your
+# sessions. They are also large binaries of someone else's copyrighted payloads.
+*.har
+*.har.gz
+
+# Backups / worklists hold thousands of real listings: owner names, phone
+# fragments, photos, and portal-copyrighted content. Personal data of people who
+# never agreed to be in your repo (DPDP Act applies to you, not just the portals).
+*backup*.json
+nobroker_backup_*.json
+pin_worklist*
+pin_corrections*
+*.csv
+
+# Scratch
+outputs/
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
