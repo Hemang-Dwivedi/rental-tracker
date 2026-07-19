@@ -1140,7 +1140,7 @@ function extractFromHar(harText){
     const isMB=isMBhtml||isMBapi;
     const isHousing=url.indexOf('apiName=SEARCH_RESULTS')!==-1&&url.indexOf('housing.com')!==-1;
     const isHousingDoc=url.indexOf('housing.com/rent/')!==-1||url.indexOf('housing.com/buy/')!==-1||url.indexOf('housing.com/flats')!==-1;
-    const isSY=url.indexOf('squareyards.com/rent/')!==-1||url.indexOf('squareyards.com/sale/')!==-1;
+    const isSY=url.indexOf('squareyards.com/rent/')!==-1||url.indexOf('squareyards.com/rental/')!==-1||url.indexOf('squareyards.com/sale/')!==-1||url.indexOf('squareyards.com/__sylisting')!==-1;
     if(!isNB&&!isAcres&&!isMB&&!isHousing&&!isHousingDoc&&!isSY)continue;
     apiCalls++;
     const body=decode((e.response&&e.response.content)||{});
